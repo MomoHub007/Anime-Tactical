@@ -1011,9 +1011,9 @@ task.spawn(function()
                         task.wait(1.5) 
                         pcall(function()
                             local screenSize = workspace.CurrentCamera.ViewportSize
-                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/2, screenSize.Y/2, 0, true, game, 1)
+                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/10, screenSize.Y/2, 0, true, game, 1)
                             task.wait(0.1)
-                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/2, screenSize.Y/2, 0, false, game, 1)
+                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/10, screenSize.Y/2, 0, false, game, 1)
                         end)
                         task.wait(0.5)
                     end
