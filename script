@@ -562,7 +562,7 @@ task.spawn(function()
                             
                             if dist > 100 then
                                 local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
-                                TweenService:Create(hrp, TweenInfo.new(1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
                                 hasFired = false 
                             else
                                 if not hasFired then
@@ -655,7 +655,7 @@ task.spawn(function()
                     lastEnemiesVal = -1
                 end
 
-                if (stuckEnemiesTimer >= 5 or not targetMob) and currentEnemies > 0 then
+                if (stuckEnemiesTimer >= 20 or not targetMob) and currentEnemies > 0 then
                     if serverRaid and serverRaid:FindFirstChild("Configs") then
                         local foundSpawn = false
                         for _, phaseFolder in pairs(serverRaid.Configs:GetChildren()) do
@@ -665,7 +665,7 @@ task.spawn(function()
                                     for _, model in pairs(spFolder:GetChildren()) do
                                         local tPart = model:IsA("Model") and model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart") or model
                                         if tPart and tPart:IsA("BasePart") then
-                                            hrp.CFrame = tPart.CFrame * CFrame.new(0, 3, 0)
+                                            hrp.CFrame = tPart.CFrame * CFrame.new(0, 0, 4)
                                             foundSpawn = true
                                             break
                                         end
@@ -703,8 +703,8 @@ task.spawn(function()
                             local dist = (hrp.Position - mobHrp.Position).Magnitude
                             
                             if dist > 100 then
-                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
-                                TweenService:Create(hrp, TweenInfo.new(1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, 4)).Position
+                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
                                 hasFired = false 
                             else
                                 if not hasFired then
