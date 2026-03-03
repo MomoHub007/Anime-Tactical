@@ -1,0 +1,346 @@
+-- =============================================================
+-- MomoHub - Auto Roll Trait + Notification Status Fix
+-- =============================================================
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+
+-- ==========================================
+-- Config Management Logic
+-- ==========================================
+local ConfigFolder = "MoMoHub_Data"
+local ConfigFile = ConfigFolder .. "/TraitSettings.json" 
+
+local DefaultConfig = {
+    AntiAFK = false,
+    AutoSave = false,
+    AutoLoad = false,
+    AutoRollTrait = false,
+    RollUnitName = "",
+    RollTraitSlot = "Primary",
+    RollTargetTraits = {},
+    RollDelay = 0.5
+}
+
+local MoMoConfig = {}
+if isfolder and not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
+
+local function LoadConfig()
+    if isfile and isfile(ConfigFile) then
+        local success, decoded = pcall(function() return HttpService:JSONDecode(readfile(ConfigFile)) end)
+        if success and type(decoded) == "table" then
+            for k, v in pairs(DefaultConfig) do
+                if decoded[k] == nil then decoded[k] = v end
+            end
+            return decoded
+        end
+    end
+    return DefaultConfig
+end
+
+local SavedData = LoadConfig()
+if SavedData.AutoLoad then
+    MoMoConfig = SavedData
+else
+    MoMoConfig = DefaultConfig
+    MoMoConfig.AutoLoad = SavedData.AutoLoad 
+    MoMoConfig.AutoSave = SavedData.AutoSave 
+end
+
+local function SaveConfig()
+    if writefile then pcall(function() writefile(ConfigFile, HttpService:JSONEncode(MoMoConfig)) end) end
+end
+local function CheckAndSave() if MoMoConfig.AutoSave then SaveConfig() end end
+
+local player = Players.LocalPlayer
+
+-- ==========================================
+-- Start Loading UI (X2ZU)
+-- ==========================================
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/x2zu/OPEN-SOURCE-UI-ROBLOX/refs/heads/main/X2ZU%20UI%20ROBLOX%20OPEN%20SOURCE/DummyUi-leak-by-x2zu/fetching-main/Tools/Framework.luau"))()
+
+local Window = Library:Window({
+    Title = "MoMoHub (Trait Only)", Desc = "Auto Roll Trait System",
+    Icon = "sparkles", Theme = "Amethyst", Color = Color3.fromRGB(170, 0, 255), 
+    Config = {Keybind = Enum.KeyCode.LeftControl, Size = UDim2.new(0, 500, 0, 480)},
+    CloseUIButton = {Enabled = false, Text = ""}
+})
+shared.MoMoWindow = Window 
+
+-- ==========================================
+-- Draggable UI Toggle Button System (Mobile)
+-- ==========================================
+do
+    local CoreGui = game:GetService("CoreGui")
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "HubMobileToggle"
+    ScreenGui.ResetOnSpawn = false
+    local success, _ = pcall(function() ScreenGui.Parent = CoreGui end)
+    if not success then ScreenGui.Parent = player:WaitForChild("PlayerGui") end
+
+    local ToggleBtn = Instance.new("ImageButton")
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Parent = ScreenGui
+    ToggleBtn.BackgroundTransparency = 1 
+    ToggleBtn.Position = UDim2.new(0.5, -30, 0.1, 0) 
+    ToggleBtn.Size = UDim2.new(0, 60, 0, 60) 
+    ToggleBtn.Image = "rbxthumb://type=Asset&id=82100122245666&w=150&h=150"
+
+    local dragging, dragStart, startPos, clickTime = false, nil, nil, 0
+
+    ToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = ToggleBtn.Position
+            clickTime = tick() 
+        end
+    end)
+
+    ToggleBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            if tick() - clickTime < 0.2 then
+                pcall(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftControl, false, game)
+                end)
+            end
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            ToggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ==========================================
+-- ฟังก์ชันสำหรับเช็คและแจ้งเตือน Trait
+-- ==========================================
+local function CheckAndNotifyTrait(unitName)
+    if unitName == "" or unitName == "No Units Found" then return end
+    pcall(function()
+        local charData = game:GetService("ReplicatedStorage"):FindFirstChild("Players_Data")
+        if charData and charData:FindFirstChild(player.Name) then
+            local targetUnit = charData[player.Name].Inventory.Units:FindFirstChild(unitName)
+            if targetUnit then
+                local pTrait = targetUnit:FindFirstChild("Primary_Trait")
+                local sTrait = targetUnit:FindFirstChild("Sub_Trait")
+                
+                local pVal = pTrait and pTrait.Value or "ไม่มี"
+                local sVal = sTrait and sTrait.Value or "ไม่มี"
+                
+                if shared.MoMoWindow then
+                    shared.MoMoWindow:Notify({
+                        Title = "🔍 Status: " .. unitName, 
+                        Desc = "Primary: " .. pVal .. "\nSub: " .. sVal, 
+                        Time = 5
+                    })
+                end
+            end
+        end
+    end)
+end
+
+-- ==========================================
+-- Tab 1: Trait (Auto Roll System)
+-- ==========================================
+local TraitTab = Window:Tab({Title = "Auto Trait", Icon = "sparkles"})
+
+TraitTab:Section({Title = "Unit Selection & Status"})
+
+local playerUnits = {}
+pcall(function()
+    local invUnits = game:GetService("ReplicatedStorage").Players_Data[player.Name].Inventory.Units
+    for _, u in ipairs(invUnits:GetChildren()) do
+        table.insert(playerUnits, u.Name)
+    end
+end)
+if #playerUnits == 0 then table.insert(playerUnits, "No Units Found") end
+
+TraitTab:Dropdown({
+    Title = "Select Unit",
+    Desc = "เลือกตัวละครที่ต้องการสุ่ม",
+    List = playerUnits,
+    Value = MoMoConfig.RollUnitName,
+    Callback = function(val)
+        MoMoConfig.RollUnitName = val
+        CheckAndSave()
+        -- เด้งแจ้งเตือนทันทีที่เลือกตัวละคร
+        CheckAndNotifyTrait(val)
+    end
+})
+
+-- ปุ่มกดเช็คสถานะแบบชัวร์ๆ
+TraitTab:Button({
+    Title = "🔍 Check Current Trait",
+    Desc = "กดเพื่อดู Trait ปัจจุบันที่ตัวละครใส่อยู่",
+    Callback = function()
+        if MoMoConfig.RollUnitName ~= "" then
+            CheckAndNotifyTrait(MoMoConfig.RollUnitName)
+        else
+            if shared.MoMoWindow then
+                shared.MoMoWindow:Notify({Title = "⚠️ Error", Desc = "กรุณาเลือก Unit ก่อนครับ", Time = 3})
+            end
+        end
+    end
+})
+
+TraitTab:Section({Title = "Roll Settings"})
+
+TraitTab:Dropdown({
+    Title = "Trait Slot",
+    Desc = "เลือกช่องที่ต้องการสุ่ม",
+    List = {"Primary", "Sub"},
+    Value = MoMoConfig.RollTraitSlot,
+    Callback = function(val)
+        MoMoConfig.RollTraitSlot = val
+        CheckAndSave()
+    end
+})
+
+local AvailableTraits = {
+    "Extremist_1", "Archmage_1", "Gods Blessing_1", 
+    "Godspeed_1", "Prodigy_1", "Deadeye_1", "Leader_1",
+    "CEO_1", "Annihilator_1", "Fortunate_1"
+}
+
+TraitTab:Dropdown({
+    Title = "Target Traits",
+    Desc = "เลือก Trait ที่ต้องการให้หยุด",
+    List = AvailableTraits,
+    Multi = true,
+    Value = MoMoConfig.RollTargetTraits,
+    Callback = function(val)
+        MoMoConfig.RollTargetTraits = val
+        CheckAndSave()
+    end
+})
+
+TraitTab:Slider({
+    Title = "Roll Delay (Seconds)", 
+    Min = 0.1, Max = 5, Rounding = 1, Value = MoMoConfig.RollDelay,
+    Callback = function(val)
+        MoMoConfig.RollDelay = val
+        CheckAndSave()
+    end
+})
+
+TraitTab:Toggle({
+    Title = "Start Auto Roll",
+    Desc = "เริ่มทำการสุ่ม Trait",
+    Value = MoMoConfig.AutoRollTrait,
+    Callback = function(State)
+        MoMoConfig.AutoRollTrait = State
+        CheckAndSave()
+    end
+})
+
+Window:Line()
+
+-- ==========================================
+-- Tab 2: Settings (Anti-AFK & Data)
+-- ==========================================
+local SettingsTab = Window:Tab({Title = "Settings", Icon = "wrench"})
+local AntiAfkConnection
+
+SettingsTab:Section({Title = "Utility"})
+SettingsTab:Toggle({
+    Title = "Anti-AFK", 
+    Desc = "ป้องกันเกมเตะเมื่อปล่อยจอทิ้งไว้นานๆ",
+    Value = MoMoConfig.AntiAFK,
+    Callback = function(State)
+        MoMoConfig.AntiAFK = State; CheckAndSave()
+        if State then
+            AntiAfkConnection = player.Idled:Connect(function()
+                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                task.wait(1)
+                VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            end)
+        else
+            if AntiAfkConnection then AntiAfkConnection:Disconnect(); AntiAfkConnection = nil end
+        end
+    end
+})
+
+SettingsTab:Section({Title = "Data Settings"})
+SettingsTab:Toggle({Title = "Auto Save Config", Value = MoMoConfig.AutoSave, Callback = function(State) MoMoConfig.AutoSave = State; SaveConfig() end})
+SettingsTab:Toggle({Title = "Auto Load Config", Value = MoMoConfig.AutoLoad, Callback = function(State) MoMoConfig.AutoLoad = State; SaveConfig() end})
+
+Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully!", Time = 3})
+
+-- ==========================================
+-- Background Loop: Auto Roll Trait
+-- ==========================================
+task.spawn(function()
+    while task.wait(0.1) do
+        if MoMoConfig.AutoRollTrait and MoMoConfig.RollUnitName ~= "" then
+            pcall(function()
+                local charData = game:GetService("ReplicatedStorage"):FindFirstChild("Players_Data")
+                if not charData then return end
+                local pFolder = charData:FindFirstChild(player.Name)
+                if not pFolder then return end
+                local targetUnit = pFolder.Inventory.Units:FindFirstChild(MoMoConfig.RollUnitName)
+                if not targetUnit then return end
+
+                local targetTraitName = MoMoConfig.RollTraitSlot .. "_Trait"
+                local traitValueObj = targetUnit:FindFirstChild(targetTraitName)
+                if not traitValueObj then return end
+
+                local currentValue = traitValueObj.Value
+
+                -- ตรวจสอบว่าตรงกับเป้าหมายหรือไม่
+                local gotWantedTrait = false
+                if type(MoMoConfig.RollTargetTraits) == "table" then
+                    for _, wanted in pairs(MoMoConfig.RollTargetTraits) do
+                        if currentValue == wanted then
+                            gotWantedTrait = true
+                            break
+                        end
+                    end
+                end
+
+                if gotWantedTrait then
+                    MoMoConfig.AutoRollTrait = false 
+                    if shared.MoMoWindow then
+                        shared.MoMoWindow:Notify({Title = "🎉 Trait Rolled!", Desc = "เป้าหมายสำเร็จ! ได้รับ: " .. currentValue, Time = 10})
+                    end
+                    return
+                end
+
+                -- แปลงชื่อ Trait
+                local serverArgsTraits = {}
+                if type(MoMoConfig.RollTargetTraits) == "table" then
+                    for _, trait in pairs(MoMoConfig.RollTargetTraits) do
+                        local baseName = string.split(trait, "_")[1]
+                        if not table.find(serverArgsTraits, baseName) then
+                            table.insert(serverArgsTraits, baseName)
+                        end
+                    end
+                end
+
+                -- ส่งคำสั่ง Roll
+                local args = {
+                    MoMoConfig.RollUnitName,
+                    MoMoConfig.RollTraitSlot,
+                    serverArgsTraits,
+                    false
+                }
+                
+                game:GetService("ReplicatedStorage").Remotes.Gamblings.Traits:FireServer(unpack(args))
+                
+                -- หน่วงเวลา
+                task.wait(MoMoConfig.RollDelay)
+            end)
+        else
+            task.wait(1)
+        end
+    end
+end)
