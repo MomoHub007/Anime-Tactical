@@ -736,7 +736,7 @@ end)
 -- Special Loop 2: Modular Raid Entry, Loot & Exit
 -- ==========================================
 task.spawn(function()
-    while task.wait(0.5) do 
+    while task.wait(1) do 
         pcall(function()
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
