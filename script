@@ -29,7 +29,13 @@ local MonsterList = {
     "Violet Tyrant",
     "Water Teacher",
     "Weakest Slayer",
-    "Wolf Assassin"
+    "Wolf Assassin",
+	"Company Owner",
+	"Mage Sister",
+	"Maid Wash",
+	"Shield Hero",
+	"Flame Master",
+	"Players"
 }
 table.sort(MonsterList) 
 
@@ -291,7 +297,7 @@ RaidTab:Toggle({
 })
 
 RaidTab:Toggle({
-    Title = "Auto Leave Raid (Remote Lobby)",
+    Title = "Auto Leave Raid",
     Desc = "Teleport to Lobby instantly after clearing and looting",
     Value = MoMoConfig.AutoLeaveRaid,
     Callback = function(State)
