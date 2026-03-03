@@ -29,7 +29,12 @@ local MonsterList = {
     "Violet Tyrant",
     "Water Teacher",
     "Weakest Slayer",
-    "Wolf Assassin"
+	"Company Owner",
+	"Mage Sister",
+	"Maid Wash",
+	"Shield Hero",
+	"Flame Master",
+	"Players"
 }
 table.sort(MonsterList) 
 
