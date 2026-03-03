@@ -1,0 +1,798 @@
+-- =============================================================
+-- MomoHub - Ultra Fast Tween + Modular Auto Raid System (Double Dungeons Added)
+-- =============================================================
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService") 
+local RunService = game:GetService("RunService")
+
+-- ==========================================
+-- Monster List (Multi-Select & Sorted A-Z)
+-- ==========================================
+local MonsterList = {
+    "Demonic Pudding",
+    "Flame Brother",
+    "Gigantic Berserker",
+    "Goofy Captain",
+    "Joker",
+    "Legendary Prince",
+    "Shotgun Jr.",
+    "Straw Hat",
+    "String Scoundrel",
+    "Sunrise Slayer",
+    "Super Legendary",
+    "Swordman",
+    "Violet Tyrant",
+    "Water Teacher",
+    "Weakest Slayer",
+    "Wolf Assassin"
+}
+table.sort(MonsterList) -- Ensure it's sorted A-Z
+
+local AutoTweenTarget = {} 
+
+-- ==========================================
+-- Raid Maps & Difficulties
+-- ==========================================
+-- Added "Double Dungeons" to the map list
+local RaidMaps = {"Namex Planet", "Colosseum Kingdom", "Demon Forest", "Dungeons Town", "Double Dungeons"}
+local RaidDifficulties = {"Easy", "Medium", "Hard", "Nightmare"}
+
+-- ==========================================
+-- Config Management Logic
+-- ==========================================
+local ConfigFolder = "MoMoHub_Data"
+local ConfigFile = ConfigFolder .. "/Settings.json"
+
+local DefaultConfig = {
+    AutoAttackAll = false, 
+    AutoTween = false, 
+    AutoTower = false,
+    FarmMode = "Near Monster", 
+    WalkSpeed = 16,
+    JumpPower = 50,
+    AntiAFK = false,
+    AutoSave = false,
+    AutoLoad = false,
+    RaidMap = RaidMaps[1],
+    RaidDiff = RaidDifficulties[1],
+    AutoRaid = false,
+    AutoClearRaid = false,
+    AutoDungeonKey = false
+}
+
+local MoMoConfig = {}
+if isfolder and not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
+
+local function LoadConfig()
+    if isfile and isfile(ConfigFile) then
+        local success, decoded = pcall(function() return HttpService:JSONDecode(readfile(ConfigFile)) end)
+        if success and type(decoded) == "table" then
+            for k, v in pairs(DefaultConfig) do
+                if decoded[k] == nil then decoded[k] = v end
+            end
+            return decoded
+        end
+    end
+    return DefaultConfig
+end
+
+local SavedData = LoadConfig()
+if SavedData.AutoLoad then
+    MoMoConfig = SavedData
+else
+    MoMoConfig = DefaultConfig
+    MoMoConfig.AutoLoad = SavedData.AutoLoad 
+    MoMoConfig.AutoSave = SavedData.AutoSave 
+end
+
+local function SaveConfig()
+    if writefile then pcall(function() writefile(ConfigFile, HttpService:JSONEncode(MoMoConfig)) end) end
+end
+local function CheckAndSave() if MoMoConfig.AutoSave then SaveConfig() end end
+
+local player = Players.LocalPlayer
+
+-- ==========================================
+-- Start Loading UI (X2ZU)
+-- ==========================================
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/x2zu/OPEN-SOURCE-UI-ROBLOX/refs/heads/main/X2ZU%20UI%20ROBLOX%20OPEN%20SOURCE/DummyUi-leak-by-x2zu/fetching-main/Tools/Framework.luau"))()
+
+local Window = Library:Window({
+    Title = "MoMoHub", Desc = "Welcome to the best script hub",
+    Icon = "badge-check", Theme = "Amethyst", Color = Color3.fromRGB(170, 0, 255), 
+    Config = {Keybind = Enum.KeyCode.LeftControl, Size = UDim2.new(0, 500, 0, 450)},
+    CloseUIButton = {Enabled = false, Text = ""}
+})
+shared.MoMoWindow = Window 
+
+-- ==========================================
+-- Draggable UI Toggle Button System
+-- ==========================================
+do
+    local CoreGui = game:GetService("CoreGui")
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "HubMobileToggle"
+    ScreenGui.ResetOnSpawn = false
+    local success, _ = pcall(function() ScreenGui.Parent = CoreGui end)
+    if not success then ScreenGui.Parent = player:WaitForChild("PlayerGui") end
+
+    local ToggleBtn = Instance.new("ImageButton")
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Parent = ScreenGui
+    ToggleBtn.BackgroundTransparency = 1 
+    ToggleBtn.Position = UDim2.new(0.5, -30, 0.1, 0) 
+    ToggleBtn.Size = UDim2.new(0, 60, 0, 60) 
+    ToggleBtn.Image = "rbxthumb://type=Asset&id=82100122245666&w=150&h=150"
+
+    local dragging, dragStart, startPos, clickTime = false, nil, nil, 0
+
+    ToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = ToggleBtn.Position
+            clickTime = tick() 
+        end
+    end)
+
+    ToggleBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            if tick() - clickTime < 0.2 then
+                pcall(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftControl, false, game)
+                end)
+            end
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            ToggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ==========================================
+-- Tab 1: Main (Normal Farm & Tower)
+-- ==========================================
+local MainTab = Window:Tab({Title = "Main", Icon = "star"})
+
+MainTab:Section({Title = "Auto Tween Farming"})
+
+MainTab:Dropdown({
+    Title = "Farm Mode",
+    Desc = "Near = Attack nearest | Select = Attack by target name",
+    List = {"Near Monster", "Select Target"}, 
+    Value = MoMoConfig.FarmMode,
+    Callback = function(val)
+        MoMoConfig.FarmMode = val
+        CheckAndSave()
+    end
+})
+
+MainTab:Dropdown({
+    Title = "Select Target Monster",
+    Desc = "Target to attack (Can select multiple targets)",
+    List = MonsterList,
+    Multi = true,
+    Value = AutoTweenTarget,
+    Callback = function(val)
+        AutoTweenTarget = val
+    end
+})
+
+MainTab:Toggle({
+    Title = "Auto Farm Monster",
+    Desc = "Normal map farming script outside Raid",
+    Value = MoMoConfig.AutoTween,
+    Callback = function(State)
+        MoMoConfig.AutoTween = State
+        CheckAndSave()
+    end
+})
+
+MainTab:Section({Title = "Tower Features"})
+
+MainTab:Toggle({
+    Title = "Auto Tower",
+    Desc = "Enter Tower before enabling",
+    Value = MoMoConfig.AutoTower,
+    Callback = function(State)
+        MoMoConfig.AutoTower = State
+        CheckAndSave()
+    end
+})
+
+Window:Line()
+
+-- ==========================================
+-- Tab 2: Raid (Smart Modular System)
+-- ==========================================
+local RaidTab = Window:Tab({Title = "Raid", Icon = "swords"})
+
+RaidTab:Section({Title = "Raid Settings"})
+
+RaidTab:Dropdown({
+    Title = "Select Raid Map",
+    List = RaidMaps,
+    Value = MoMoConfig.RaidMap,
+    Callback = function(val)
+        MoMoConfig.RaidMap = val
+        CheckAndSave()
+    end
+})
+
+RaidTab:Dropdown({
+    Title = "Select Difficulty",
+    List = RaidDifficulties,
+    Value = MoMoConfig.RaidDiff,
+    Callback = function(val)
+        MoMoConfig.RaidDiff = val
+        CheckAndSave()
+    end
+})
+
+RaidTab:Section({Title = "Raid Automation"})
+
+RaidTab:Toggle({
+    Title = "Auto Raid",
+    Desc = "Enter -> Wait clear -> Collect -> Exit ",
+    Value = MoMoConfig.AutoRaid,
+    Callback = function(State)
+        MoMoConfig.AutoRaid = State
+        CheckAndSave()
+        if State and shared.MoMoWindow then
+            shared.MoMoWindow:Notify({Title = "Raid Mode ON", Desc = "Other functions will be temporarily suspended", Time = 3})
+        end
+    end
+})
+
+RaidTab:Toggle({
+    Title = "Auto Clear Raid Monster",
+    Desc = "Enable to automatically attack monsters in Raid",
+    Value = MoMoConfig.AutoClearRaid,
+    Callback = function(State)
+        MoMoConfig.AutoClearRaid = State
+        CheckAndSave()
+    end
+})
+
+RaidTab:Toggle({
+    Title = "Auto Dungeons Key",
+    Desc = "Enable to collect chests (Requires Key)",
+    Value = MoMoConfig.AutoDungeonKey,
+    Callback = function(State)
+        MoMoConfig.AutoDungeonKey = State
+        CheckAndSave()
+    end
+})
+
+Window:Line()
+
+-- ==========================================
+-- Tab 3: Player / Settings
+-- ==========================================
+local PlayerTab = Window:Tab({Title = "Player", Icon = "user"})
+PlayerTab:Slider({
+    Title = "WalkSpeed", Min = 16, Max = 250, Rounding = 0, Value = MoMoConfig.WalkSpeed,
+    Callback = function(speed)
+        MoMoConfig.WalkSpeed = speed; CheckAndSave()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = speed
+        end
+    end
+})
+PlayerTab:Slider({
+    Title = "JumpPower", Min = 50, Max = 300, Rounding = 0, Value = MoMoConfig.JumpPower,
+    Callback = function(power)
+        MoMoConfig.JumpPower = power; CheckAndSave()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.JumpPower = power
+        end
+    end
+})
+
+local SettingsTab = Window:Tab({Title = "Settings", Icon = "wrench"})
+local AntiAfkConnection
+SettingsTab:Toggle({
+    Title = "Anti-AFK", Value = MoMoConfig.AntiAFK,
+    Callback = function(State)
+        MoMoConfig.AntiAFK = State; CheckAndSave()
+        if State then
+            AntiAfkConnection = player.Idled:Connect(function()
+                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                task.wait(1)
+                VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            end)
+        else
+            if AntiAfkConnection then AntiAfkConnection:Disconnect(); AntiAfkConnection = nil end
+        end
+    end
+})
+SettingsTab:Toggle({Title = "Auto Save Config", Value = MoMoConfig.AutoSave, Callback = function(State) MoMoConfig.AutoSave = State; SaveConfig() end})
+SettingsTab:Toggle({Title = "Auto Load Config", Value = MoMoConfig.AutoLoad, Callback = function(State) MoMoConfig.AutoLoad = State; SaveConfig() end})
+
+Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully! [Double Dungeons Support]", Time = 4})
+
+-- ==========================================
+-- General Background Loop System
+-- ==========================================
+
+task.spawn(function()
+    while task.wait(1) do
+        if MoMoConfig.AutoRaid or MoMoConfig.AutoTween or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower then
+            pcall(function()
+                local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
+                if rs then
+                    rs:FireServer(unpack({buffer.fromstring("\f\001")}))
+                    rs:FireServer(unpack({buffer.fromstring("\r\000")}))
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if MoMoConfig.AutoAttackAll and not MoMoConfig.AutoRaid then
+            pcall(function() 
+                local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
+                if rs then
+                    rs:FireServer(unpack({buffer.fromstring("\017\000")}))
+                    rs:FireServer(unpack({buffer.fromstring("\016\000")}))
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- Search and Tween Loop for Normal Farm
+-- ==========================================
+local function GetClosestServerTarget()
+    local worlds = workspace:FindFirstChild("Worlds")
+    if not worlds then return nil end
+    local targets = worlds:FindFirstChild("Targets")
+    if not targets then return nil end
+    local serverFolder = targets:FindFirstChild("Server")
+    if not serverFolder then return nil end
+
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local closestModel = nil
+    local shortestDistance = math.huge
+
+    for _, serverModel in pairs(serverFolder:GetChildren()) do
+        if serverModel:IsA("Model") then
+            local hum = serverModel:FindFirstChild("Humanoid")
+            local mobHrp = serverModel:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and mobHrp then
+                local isValid = false
+                
+                if MoMoConfig.FarmMode == "Near Monster" then
+                    isValid = true
+                elseif MoMoConfig.FarmMode == "Select Target" then
+                    for _, desc in pairs(serverModel:GetDescendants()) do
+                        if desc.Name == "Names" and desc:IsA("TextLabel") then
+                            if type(AutoTweenTarget) == "table" then
+                                if table.find(AutoTweenTarget, desc.Text) or AutoTweenTarget[desc.Text] then
+                                    isValid = true
+                                    break
+                                end
+                            elseif type(AutoTweenTarget) == "string" then
+                                if AutoTweenTarget == desc.Text then
+                                    isValid = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                if isValid then
+                    local dist = (hrp.Position - mobHrp.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closestModel = serverModel
+                    end
+                end
+            end
+        end
+    end
+    return closestModel
+end
+
+task.spawn(function()
+    while task.wait(0.01) do 
+        if MoMoConfig.AutoTween and not MoMoConfig.AutoRaid and not MoMoConfig.AutoClearRaid and not MoMoConfig.AutoTower then 
+            pcall(function()
+                local targetModel = GetClosestServerTarget()
+                if targetModel then
+                    local mobHrp = targetModel:FindFirstChild("HumanoidRootPart")
+                    local hum = targetModel:FindFirstChild("Humanoid")
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    
+                    if hrp and mobHrp and hum then
+                        local req = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                        local gameplayReq = req and req:FindFirstChild("Gameplays") and req.Gameplays:FindFirstChild("Request")
+                        
+                        local lastHealth = hum.Health
+                        local stuckTimer = 0
+                        local hasFired = false
+                        
+                        repeat
+                            task.wait(0.01)
+                            if not targetModel or not targetModel.Parent or not targetModel:FindFirstChild("HumanoidRootPart") then break end
+                            if not MoMoConfig.AutoTween or MoMoConfig.AutoRaid or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower then break end
+                            
+                            local dist = (hrp.Position - mobHrp.Position).Magnitude
+                            if dist > 100 then
+                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
+                                TweenService:Create(hrp, TweenInfo.new(1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                hasFired = false 
+                            else
+                                if not hasFired then
+                                    if gameplayReq then gameplayReq:FireServer(targetModel.Name, "Mouse") end
+                                    hasFired = true
+                                    lastHealth = hum.Health
+                                    stuckTimer = 0
+                                else
+                                    stuckTimer = stuckTimer + 0.01
+                                    if hum.Health < lastHealth then
+                                        lastHealth = hum.Health
+                                        stuckTimer = 0
+                                    end
+                                    if stuckTimer >= 1 then
+                                        if gameplayReq then gameplayReq:FireServer(targetModel.Name, "Mouse") end
+                                        stuckTimer = 0 
+                                    end
+                                end
+                            end
+                        until hum.Health <= 0
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- Special Loop: Auto Tower Monster
+-- ==========================================
+local function GetClosestTowerTarget_Clients()
+    local worlds = workspace:FindFirstChild("Worlds")
+    local clientsFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Clients")
+    local serverFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Server")
+    
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not clientsFolder or not serverFolder then return nil end
+
+    local closestMob = nil
+    local shortestDistance = math.huge
+
+    for _, mob in pairs(clientsFolder:GetChildren()) do
+        if string.find(mob.Name, "Tower_") then
+            local serverMob = serverFolder:FindFirstChild(mob.Name)
+            if serverMob then
+                local serverHum = serverMob:FindFirstChild("Humanoid")
+                local mobHrp = mob:FindFirstChild("HumanoidRootPart")
+                
+                if serverHum and serverHum.Health > 0 and mobHrp then
+                    local dist = (hrp.Position - mobHrp.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closestMob = mob
+                    end
+                end
+            end
+        end
+    end
+    return closestMob
+end
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if MoMoConfig.AutoTower then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local targetMob = GetClosestTowerTarget_Clients()
+                
+                if targetMob then
+                    local mobHrp = targetMob:FindFirstChild("HumanoidRootPart")
+                    
+                    local serverFolder = workspace:FindFirstChild("Worlds") and workspace.Worlds:FindFirstChild("Targets") and workspace.Worlds.Targets:FindFirstChild("Server")
+                    local serverMob = serverFolder and serverFolder:FindFirstChild(targetMob.Name)
+                    local serverHum = serverMob and serverMob:FindFirstChild("Humanoid")
+                    
+                    if mobHrp and serverHum then
+                        local req = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                        local gameplayReq = req and req:FindFirstChild("Gameplays") and req.Gameplays:FindFirstChild("Request")
+                        
+                        local lastHealth = serverHum.Health
+                        local stuckTimer = 0
+                        local hasFired = false
+                        
+                        repeat
+                            task.wait(0.01)
+                            if not targetMob or not targetMob.Parent or not targetMob:FindFirstChild("HumanoidRootPart") then break end
+                            if not serverMob or not serverMob.Parent or not serverMob:FindFirstChild("Humanoid") then break end
+                            if not MoMoConfig.AutoTower then break end
+                            
+                            local dist = (hrp.Position - mobHrp.Position).Magnitude
+                            
+                            if dist > 100 then
+                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
+                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                hasFired = false 
+                            else
+                                if not hasFired then
+                                    if gameplayReq then gameplayReq:FireServer(targetMob.Name, "Mouse") end
+                                    hasFired = true
+                                    lastHealth = serverHum.Health
+                                    stuckTimer = 0
+                                else
+                                    stuckTimer = stuckTimer + 0.01
+                                    if serverHum.Health < lastHealth then
+                                        lastHealth = serverHum.Health
+                                        stuckTimer = 0
+                                    end
+                                    if stuckTimer >= 1 then
+                                        if gameplayReq then gameplayReq:FireServer(targetMob.Name, "Mouse") end
+                                        stuckTimer = 0 
+                                    end
+                                end
+                            end
+                        until serverHum.Health <= 0
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- Special Loop: Auto Clear Raid Monster 
+-- ==========================================
+local function GetClosestRaidTarget_Clients()
+    local worlds = workspace:FindFirstChild("Worlds")
+    local clientsFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Clients")
+    local serverFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Server")
+    
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not clientsFolder or not serverFolder then return nil end
+
+    local closestMob = nil
+    local shortestDistance = math.huge
+
+    for _, mob in pairs(clientsFolder:GetChildren()) do
+        if string.find(mob.Name, "Raids") then
+            local serverMob = serverFolder:FindFirstChild(mob.Name)
+            if serverMob then
+                local serverHum = serverMob:FindFirstChild("Humanoid")
+                local mobHrp = mob:FindFirstChild("HumanoidRootPart")
+                
+                if serverHum and serverHum.Health > 0 and mobHrp then
+                    local dist = (hrp.Position - mobHrp.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closestMob = mob
+                    end
+                end
+            end
+        end
+    end
+    return closestMob
+end
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if MoMoConfig.AutoClearRaid then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local targetMob = GetClosestRaidTarget_Clients()
+                
+                if targetMob then
+                    local mobHrp = targetMob:FindFirstChild("HumanoidRootPart")
+                    
+                    local serverFolder = workspace:FindFirstChild("Worlds") and workspace.Worlds:FindFirstChild("Targets") and workspace.Worlds.Targets:FindFirstChild("Server")
+                    local serverMob = serverFolder and serverFolder:FindFirstChild(targetMob.Name)
+                    local serverHum = serverMob and serverMob:FindFirstChild("Humanoid")
+                    
+                    if mobHrp and serverHum then
+                        local req = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                        local gameplayReq = req and req:FindFirstChild("Gameplays") and req.Gameplays:FindFirstChild("Request")
+                        
+                        local lastHealth = serverHum.Health
+                        local stuckTimer = 0
+                        local hasFired = false
+                        
+                        repeat
+                            task.wait(0.01)
+                            if not targetMob or not targetMob.Parent or not targetMob:FindFirstChild("HumanoidRootPart") then break end
+                            if not serverMob or not serverMob.Parent or not serverMob:FindFirstChild("Humanoid") then break end
+                            if not MoMoConfig.AutoClearRaid then break end
+                            
+                            local dist = (hrp.Position - mobHrp.Position).Magnitude
+                            
+                            if dist > 100 then
+                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
+                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                hasFired = false 
+                            else
+                                if not hasFired then
+                                    if gameplayReq then gameplayReq:FireServer(targetMob.Name, "Mouse") end
+                                    hasFired = true
+                                    lastHealth = serverHum.Health
+                                    stuckTimer = 0
+                                else
+                                    stuckTimer = stuckTimer + 0.01
+                                    if serverHum.Health < lastHealth then
+                                        lastHealth = serverHum.Health
+                                        stuckTimer = 0
+                                    end
+                                    if stuckTimer >= 1 then
+                                        if gameplayReq then gameplayReq:FireServer(targetMob.Name, "Mouse") end
+                                        stuckTimer = 0 
+                                    end
+                                end
+                            end
+                        until serverHum.Health <= 0
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- Special Loop 2: Auto Raid Navigation (With Double Dungeons logic)
+-- ==========================================
+task.spawn(function()
+    while task.wait(0.5) do 
+        if MoMoConfig.AutoRaid then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local serverRaidName = MoMoConfig.RaidMap .. "_Server_" .. player.Name
+                local clientRaidName = MoMoConfig.RaidMap .. "_Clients_" .. player.Name
+                
+                local raidsVisual = workspace:FindFirstChild("Raids_Visual")
+                local serverRaid = raidsVisual and raidsVisual:FindFirstChild(serverRaidName)
+                local clientRaid = raidsVisual and raidsVisual:FindFirstChild(clientRaidName)
+
+                if not serverRaid then
+                    if MoMoConfig.RaidMap == "Double Dungeons" then
+                        -- Double Dungeons specific join logic
+                        local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
+                        if rs then rs:FireServer(unpack({buffer.fromstring("\005\r\000Dungeons Town")})) end
+                        
+                        task.wait(3)
+                        
+                        char = player.Character
+                        hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if not hrp then return end
+                        
+                        local raidsEntering = workspace:FindFirstChild("Raids_Entering")
+                        local specifyCenter = raidsEntering and raidsEntering:FindFirstChild("Specify") and raidsEntering.Specify:FindFirstChild("Centers")
+                        
+                        if specifyCenter then
+                            hrp.CFrame = specifyCenter.CFrame
+                            task.wait(0.5)
+                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                            if remotes and remotes:FindFirstChild("Systems") and remotes.Systems:FindFirstChild("RaidsEvent") then
+                                remotes.Systems.RaidsEvent:FireServer("Double Dungeons", "Nightmare")
+                            end
+                        end
+                        task.wait(3)
+                    else
+                        -- Normal Raid join logic
+                        local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
+                        if rs then rs:FireServer(unpack({buffer.fromstring("\005\005\000Lobby\004\005\000Lobby")})) end
+                        
+                        task.wait(3) 
+                        
+                        char = player.Character
+                        hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if not hrp then return end
+                        
+                        local raidsEntering = workspace:FindFirstChild("Raids_Entering")
+                        local podCenter = raidsEntering and raidsEntering:FindFirstChild("Pod_04") and raidsEntering.Pod_04:FindFirstChild("Centers")
+                        
+                        if podCenter then
+                            hrp.CFrame = podCenter.CFrame
+                            task.wait(0.5)
+                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                            if remotes and remotes:FindFirstChild("Systems") and remotes.Systems:FindFirstChild("RaidsEvent") then
+                                remotes.Systems.RaidsEvent:FireServer(MoMoConfig.RaidMap, MoMoConfig.RaidDiff)
+                            end
+                        end
+                        task.wait(3) 
+                    end
+                else
+                    local enemiesVal = serverRaid:FindFirstChild("Configs") and serverRaid.Configs:FindFirstChild("Others") and serverRaid.Configs.Others:FindFirstChild("Enemies")
+                    local serverFolder = workspace:FindFirstChild("Worlds") and workspace.Worlds:FindFirstChild("Targets") and workspace.Worlds.Targets:FindFirstChild("Server")
+                    local hasMobs = false
+                    if serverFolder then
+                        for _, mob in pairs(serverFolder:GetChildren()) do
+                            if string.find(mob.Name, "Raids") then
+                                hasMobs = true
+                                break
+                            end
+                        end
+                    end
+                    local isCleared = false
+                    if enemiesVal and tonumber(enemiesVal.Value) == 0 and not hasMobs then
+                        isCleared = true
+                    end
+                    if isCleared and clientRaid then
+                        task.wait(3) 
+                        local rewardsFolder = clientRaid:FindFirstChild("Configs") and clientRaid.Configs:FindFirstChild("Others") and clientRaid.Configs.Others:FindFirstChild("Rewards")
+                        local function collectBox(boxType)
+                            if rewardsFolder and rewardsFolder:FindFirstChild(boxType) then
+                                for _, item in pairs(rewardsFolder[boxType]:GetChildren()) do
+                                    if item:IsA("BasePart") or item:IsA("Model") then
+                                        local targetPart = item:IsA("Model") and item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart") or item
+                                        if targetPart then
+                                            hrp.CFrame = targetPart.CFrame
+                                            task.wait(0.2)
+                                            local prompt = item:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                            if prompt then fireproximityprompt(prompt) end
+                                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                            task.wait(0.1)
+                                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                            task.wait(1) 
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        collectBox("Golds")
+                        collectBox("Special")
+                        if MoMoConfig.AutoDungeonKey then
+                            collectBox("Purple")
+                        end
+                        local portalFolder = clientRaid:FindFirstChild("Configs") and clientRaid.Configs:FindFirstChild("Others") and clientRaid.Configs.Others:FindFirstChild("Portal")
+                        if portalFolder then
+                            for _, p in pairs(portalFolder:GetChildren()) do
+                                if p:IsA("BasePart") or p:IsA("Model") then
+                                    local tPart = p:IsA("Model") and p.PrimaryPart or p:FindFirstChildWhichIsA("BasePart") or p
+                                    hrp.CFrame = tPart.CFrame
+                                    task.wait(0.5)
+                                    local prompt = p:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                    if prompt then fireproximityprompt(prompt) end
+                                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                    task.wait(0.1)
+                                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                    task.wait(1)
+                                end
+                            end
+                        end
+                        repeat task.wait(0.5) until not raidsVisual:FindFirstChild(serverRaidName) or not MoMoConfig.AutoRaid
+                    end
+                end
+            end)
+        end
+    end
+end)
