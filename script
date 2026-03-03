@@ -764,7 +764,7 @@ task.spawn(function()
                     local specifyCenter = raidsEntering and raidsEntering:FindFirstChild("Specify") and raidsEntering.Specify:FindFirstChild("Centers")
                     if specifyCenter then
                         hrp.CFrame = specifyCenter.CFrame
-                        task.wait(0.5)
+                        task.wait(2)
                         local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                         if remotes and remotes:FindFirstChild("Systems") and remotes.Systems:FindFirstChild("RaidsEvent") then
                             remotes.Systems.RaidsEvent:FireServer("Double Dungeons", "Nightmare")
@@ -784,7 +784,7 @@ task.spawn(function()
                     local podCenter = raidsEntering and raidsEntering:FindFirstChild("Pod_04") and raidsEntering.Pod_04:FindFirstChild("Centers")
                     if podCenter then
                         hrp.CFrame = podCenter.CFrame
-                        task.wait(0.5)
+                        task.wait(1)
                         local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                         if remotes and remotes:FindFirstChild("Systems") and remotes.Systems:FindFirstChild("RaidsEvent") then
                             remotes.Systems.RaidsEvent:FireServer(MoMoConfig.RaidMap, MoMoConfig.RaidDiff)
