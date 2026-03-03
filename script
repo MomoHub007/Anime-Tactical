@@ -1,5 +1,5 @@
 -- =============================================================
--- MomoHub - Ultra Fast Tween + Fully Modular Raid System (Perfect Loop & Loot)
+-- MomoHub - Ultra Fast Tween + Auto Boss Fight + Modular Raid
 -- =============================================================
 
 local HttpService = game:GetService("HttpService")
@@ -29,13 +29,7 @@ local MonsterList = {
     "Violet Tyrant",
     "Water Teacher",
     "Weakest Slayer",
-    "Wolf Assassin",
-	"Company Owner",
-	"Mage Sister",
-	"Maid Wash",
-	"Shield Hero",
-	"Flame Master",
-	"Players"
+    "Wolf Assassin"
 }
 table.sort(MonsterList) 
 
@@ -57,6 +51,7 @@ local DefaultConfig = {
     AutoAttackAll = false, 
     AutoTween = false, 
     AutoTower = false,
+    AutoBossFight = false, -- เพิ่ม Config สำหรับ Auto Boss Fight
     FarmMode = "Near Monster", 
     WalkSpeed = 16,
     JumpPower = 50,
@@ -103,6 +98,33 @@ end
 local function CheckAndSave() if MoMoConfig.AutoSave then SaveConfig() end end
 
 local player = Players.LocalPlayer
+
+-- ==========================================
+-- Priority Helpers
+-- ==========================================
+local function IsBossSpawned()
+    local bossVisual = workspace:FindFirstChild("BossFights_Visual")
+    local demonForest = bossVisual and bossVisual:FindFirstChild("Demon Forest")
+    local configs = demonForest and demonForest:FindFirstChild("Configs")
+    local others = configs and configs:FindFirstChild("Others")
+    local enemiesObj = others and others:FindFirstChild("Enemies")
+    
+    if enemiesObj and tonumber(enemiesObj.Value) and tonumber(enemiesObj.Value) > 0 then
+        return true
+    end
+    return false
+end
+
+local function IsInRaid()
+    local serverRaidName = MoMoConfig.RaidMap .. "_Server_" .. player.Name
+    local clientRaidName = MoMoConfig.RaidMap .. "_Clients_" .. player.Name
+    local raidsVisual = workspace:FindFirstChild("Raids_Visual")
+    
+    if raidsVisual and (raidsVisual:FindFirstChild(serverRaidName) or raidsVisual:FindFirstChild(clientRaidName)) then
+        return true
+    end
+    return false
+end
 
 -- ==========================================
 -- Start Loading UI (X2ZU)
@@ -169,7 +191,7 @@ do
 end
 
 -- ==========================================
--- Tab 1: Main (Normal Farm & Tower)
+-- Tab 1: Main (Normal Farm, Tower & Boss)
 -- ==========================================
 local MainTab = Window:Tab({Title = "Main", Icon = "star"})
 
@@ -207,7 +229,6 @@ MainTab:Toggle({
     end
 })
 
-
 MainTab:Section({Title = "Tower Features"})
 
 MainTab:Toggle({
@@ -219,6 +240,19 @@ MainTab:Toggle({
         CheckAndSave()
     end
 })
+
+MainTab:Section({Title = "BossFight Features"})
+
+MainTab:Toggle({
+    Title = "Auto Boss Fight (Demon Forest)",
+    Desc = "Prioritize Boss. Will pause Auto Farm when spawned.",
+    Value = MoMoConfig.AutoBossFight,
+    Callback = function(State)
+        MoMoConfig.AutoBossFight = State
+        CheckAndSave()
+    end
+})
+
 
 Window:Line()
 
@@ -274,7 +308,7 @@ RaidTab:Toggle({
     end
 })
 
-RaidTab:Section({Title = "Raid Loot & Exit (Modular)"})
+RaidTab:Section({Title = "Raid Loot & Exit"})
 
 RaidTab:Toggle({
     Title = "Auto Collect Rewards",
@@ -287,7 +321,7 @@ RaidTab:Toggle({
 })
 
 RaidTab:Toggle({
-    Title = "Auto Dungeons Key ",
+    Title = "Auto Dungeons Key (Purple Chest)",
     Desc = "Collect purple chests (Requires Key)",
     Value = MoMoConfig.AutoDungeonKey,
     Callback = function(State)
@@ -351,7 +385,7 @@ SettingsTab:Toggle({
 SettingsTab:Toggle({Title = "Auto Save Config", Value = MoMoConfig.AutoSave, Callback = function(State) MoMoConfig.AutoSave = State; SaveConfig() end})
 SettingsTab:Toggle({Title = "Auto Load Config", Value = MoMoConfig.AutoLoad, Callback = function(State) MoMoConfig.AutoLoad = State; SaveConfig() end})
 
-Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully! [Auto Click UI Updated]", Time = 4})
+Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully! [Boss Fight Updated]", Time = 4})
 
 -- ==========================================
 -- General Background Loop System
@@ -359,7 +393,7 @@ Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully! [Auto Click UI Up
 
 task.spawn(function()
     while task.wait(1) do
-        if MoMoConfig.AutoRaid or MoMoConfig.AutoTween or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower then
+        if MoMoConfig.AutoRaid or MoMoConfig.AutoTween or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower or MoMoConfig.AutoBossFight then
             pcall(function()
                 local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
                 if rs then
@@ -445,7 +479,10 @@ end
 
 task.spawn(function()
     while task.wait(0.01) do 
-        if MoMoConfig.AutoTween and not MoMoConfig.AutoRaid and not MoMoConfig.AutoClearRaid and not MoMoConfig.AutoTower then 
+        -- Pause if Raid or Tower is active, OR if Boss is Spawned and enabled
+        local isBossPriorityActive = MoMoConfig.AutoBossFight and IsBossSpawned()
+        
+        if MoMoConfig.AutoTween and not MoMoConfig.AutoRaid and not MoMoConfig.AutoClearRaid and not MoMoConfig.AutoTower and not isBossPriorityActive then 
             pcall(function()
                 local targetModel = GetClosestServerTarget()
                 if targetModel then
@@ -465,12 +502,12 @@ task.spawn(function()
                         repeat
                             task.wait(0.01)
                             if not targetModel or not targetModel.Parent or not targetModel:FindFirstChild("HumanoidRootPart") then break end
-                            if not MoMoConfig.AutoTween or MoMoConfig.AutoRaid or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower then break end
+                            if not MoMoConfig.AutoTween or MoMoConfig.AutoRaid or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower or (MoMoConfig.AutoBossFight and IsBossSpawned()) then break end
                             
                             local dist = (hrp.Position - mobHrp.Position).Magnitude
                             if dist > 100 then
                                 local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
-                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                TweenService:Create(hrp, TweenInfo.new(1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
                                 hasFired = false 
                             else
                                 if not hasFired then
@@ -491,6 +528,118 @@ task.spawn(function()
                                 end
                             end
                         until hum.Health <= 0
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- Special Loop: Auto Boss Fight (Demon Forest)
+-- ==========================================
+task.spawn(function()
+    while task.wait(0.1) do
+        if MoMoConfig.AutoBossFight then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                -- Priority 1: Finish active Raid first
+                if IsInRaid() then return end
+
+                if IsBossSpawned() then
+                    -- Search for Boss in Clients
+                    local worlds = workspace:FindFirstChild("Worlds")
+                    local clientsFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Clients")
+                    local serverFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Server")
+
+                    local targetMob = nil
+                    local shortestDistance = math.huge
+
+                    if clientsFolder then
+                        for _, mob in pairs(clientsFolder:GetChildren()) do
+                            if string.find(mob.Name, "BossFight") then
+                                local mobHrp = mob:FindFirstChild("HumanoidRootPart")
+                                if mobHrp then
+                                    local dist = (hrp.Position - mobHrp.Position).Magnitude
+                                    if dist < shortestDistance then
+                                        shortestDistance = dist
+                                        targetMob = mob
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if targetMob then
+                        -- Combat Loop for Boss
+                        local mobHrp = targetMob:FindFirstChild("HumanoidRootPart")
+                        local serverMob = serverFolder and serverFolder:FindFirstChild(targetMob.Name)
+                        local serverHum = serverMob and serverMob:FindFirstChild("Humanoid")
+
+                        if mobHrp and serverHum then
+                            local req = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                            local gameplayReq = req and req:FindFirstChild("Gameplays") and req.Gameplays:FindFirstChild("Request")
+                            
+                            local lastHealth = serverHum.Health
+                            local stuckTimer = 0
+                            local hasFired = false
+                            
+                            repeat
+                                task.wait(0.01)
+                                if not targetMob or not targetMob.Parent or not targetMob:FindFirstChild("HumanoidRootPart") then break end
+                                if not serverMob or not serverMob.Parent or not serverMob:FindFirstChild("Humanoid") then break end
+                                if not MoMoConfig.AutoBossFight then break end
+                                
+                                local dist = (hrp.Position - mobHrp.Position).Magnitude
+                                
+                                if dist > 100 then
+                                    local standPos = (mobHrp.CFrame * CFrame.new(0, 0, 4)).Position
+                                    TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                    hasFired = false 
+                                else
+                                    if not hasFired then
+                                        if gameplayReq then gameplayReq:FireServer(targetMob.Name, "Mouse") end
+                                        hasFired = true
+                                        lastHealth = serverHum.Health
+                                        stuckTimer = 0
+                                    else
+                                        stuckTimer = stuckTimer + 0.01
+                                        if serverHum.Health < lastHealth then
+                                            lastHealth = serverHum.Health
+                                            stuckTimer = 0
+                                        end
+                                        if stuckTimer >= 1 then
+                                            if gameplayReq then gameplayReq:FireServer(targetMob.Name, "Mouse") end
+                                            stuckTimer = 0 
+                                        end
+                                    end
+                                end
+                            until serverHum.Health <= 0
+                        end
+                    else
+                        -- Navigation to Boss (If not found locally)
+                        local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
+                        if rs then rs:FireServer(unpack({buffer.fromstring("\005\f\000Demon Forest")})) end
+                        
+                        task.wait(3)
+                        
+                        char = player.Character
+                        hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if not hrp then return end
+                        
+                        local bossEntering = workspace:FindFirstChild("BossFight_Entering")
+                        local demonForestEnter = bossEntering and bossEntering:FindFirstChild("Demon Forest")
+                        
+                        if demonForestEnter then
+                            local tPart = demonForestEnter:IsA("Model") and demonForestEnter.PrimaryPart or demonForestEnter:FindFirstChildWhichIsA("BasePart") or demonForestEnter
+                            if tPart and tPart:IsA("BasePart") then
+                                hrp.CFrame = tPart.CFrame
+                                task.wait(3)	 
+                            end
+                        end
                     end
                 end
             end)
@@ -535,7 +684,9 @@ end
 
 task.spawn(function()
     while task.wait(0.01) do
-        if MoMoConfig.AutoTower then
+        local isBossPriorityActive = MoMoConfig.AutoBossFight and IsBossSpawned()
+        
+        if MoMoConfig.AutoTower and not isBossPriorityActive then
             pcall(function()
                 local char = player.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -562,12 +713,12 @@ task.spawn(function()
                             task.wait(0.01)
                             if not targetMob or not targetMob.Parent or not targetMob:FindFirstChild("HumanoidRootPart") then break end
                             if not serverMob or not serverMob.Parent or not serverMob:FindFirstChild("Humanoid") then break end
-                            if not MoMoConfig.AutoTower then break end
+                            if not MoMoConfig.AutoTower or (MoMoConfig.AutoBossFight and IsBossSpawned()) then break end
                             
                             local dist = (hrp.Position - mobHrp.Position).Magnitude
                             
                             if dist > 100 then
-                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
+                                local standPos = (mobHrp.CFrame * CFrame.new(0, 0, 4)).Position
                                 TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
                                 hasFired = false 
                             else
@@ -701,7 +852,7 @@ task.spawn(function()
                         local hasFired = false
                         
                         repeat
-                            task.wait(0.01)
+                            task.wait(0.1)
                             if not targetMob or not targetMob.Parent or not targetMob:FindFirstChild("HumanoidRootPart") then break end
                             if not serverMob or not serverMob.Parent or not serverMob:FindFirstChild("Humanoid") then break end
                             if not MoMoConfig.AutoClearRaid then break end
@@ -719,7 +870,7 @@ task.spawn(function()
                                     lastHealth = serverHum.Health
                                     stuckCombatTimer = 0
                                 else
-                                    stuckCombatTimer = stuckCombatTimer + 0.01
+                                    stuckCombatTimer = stuckCombatTimer + 0.1
                                     if serverHum.Health < lastHealth then
                                         lastHealth = serverHum.Health
                                         stuckCombatTimer = 0
@@ -742,7 +893,7 @@ end)
 -- Special Loop 2: Modular Raid Entry, Loot & Exit
 -- ==========================================
 task.spawn(function()
-    while task.wait(1) do 
+    while task.wait(0.5) do 
         pcall(function()
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -755,8 +906,10 @@ task.spawn(function()
             local serverRaid = raidsVisual and raidsVisual:FindFirstChild(serverRaidName)
             local clientRaid = raidsVisual and raidsVisual:FindFirstChild(clientRaidName)
 
-            -- [Step 1] Auto Join (วนลูปจนกว่าโฟลเดอร์ Clients จะปรากฏ)
-            if MoMoConfig.AutoRaid and not clientRaid then
+            -- Priority 1: Prevent joining new raid if Boss is spawned and enabled
+            local isBossPriorityActive = MoMoConfig.AutoBossFight and IsBossSpawned()
+
+            if MoMoConfig.AutoRaid and not clientRaid and not isBossPriorityActive then
                 if MoMoConfig.RaidMap == "Double Dungeons" then
                     local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
                     if rs then rs:FireServer(unpack({buffer.fromstring("\005\r\000Dungeons Town")})) end
@@ -770,7 +923,7 @@ task.spawn(function()
                     local specifyCenter = raidsEntering and raidsEntering:FindFirstChild("Specify") and raidsEntering.Specify:FindFirstChild("Centers")
                     if specifyCenter then
                         hrp.CFrame = specifyCenter.CFrame
-                        task.wait(2)
+                        task.wait(0.5)
                         local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                         if remotes and remotes:FindFirstChild("Systems") and remotes.Systems:FindFirstChild("RaidsEvent") then
                             remotes.Systems.RaidsEvent:FireServer("Double Dungeons", "Nightmare")
@@ -790,7 +943,7 @@ task.spawn(function()
                     local podCenter = raidsEntering and raidsEntering:FindFirstChild("Pod_04") and raidsEntering.Pod_04:FindFirstChild("Centers")
                     if podCenter then
                         hrp.CFrame = podCenter.CFrame
-                        task.wait(1)
+                        task.wait(0.5)
                         local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                         if remotes and remotes:FindFirstChild("Systems") and remotes.Systems:FindFirstChild("RaidsEvent") then
                             remotes.Systems.RaidsEvent:FireServer(MoMoConfig.RaidMap, MoMoConfig.RaidDiff)
@@ -799,7 +952,6 @@ task.spawn(function()
                     task.wait(3) 
                 end
             
-            -- [Step 2 & 3] ตรวจสอบจบด่าน -> เก็บของ -> ออกหน้าจอ -> ออกด่าน
             elseif serverRaid and clientRaid then
                 
                 local enemiesValObj = serverRaid:FindFirstChild("Configs") and serverRaid.Configs:FindFirstChild("Others") and serverRaid.Configs.Others:FindFirstChild("Enemies")
@@ -816,10 +968,8 @@ task.spawn(function()
                     end
                 end
                 
-                -- ทำงานทันทีเมื่อเงื่อนไขเคลียร์ด่านครบ
                 if currentEnemies == 0 and not hasMobs then
                     
-                    -- ระบบเก็บกล่อง
                     if MoMoConfig.AutoCollectReward then
                         local rewardsFolder = clientRaid:FindFirstChild("Configs") and clientRaid.Configs:FindFirstChild("Others") and clientRaid.Configs.Others:FindFirstChild("Rewards")
                         
@@ -853,23 +1003,20 @@ task.spawn(function()
                             collectBox("Purple")
                         end
 
-                        -- [ระบบใหม่] คลิกเคลียร์หน้าจอ UI "(Click anywhere to continue)"
-                        task.wait(1.5) -- รอหน้าต่างแอนิเมชันเด้งจนสุด
+                        task.wait(1.5) 
                         pcall(function()
-                            -- จำลองคลิกซ้ายกลางจอ
-                            VirtualInputManager:SendMouseButtonEvent(250, 250, 0, true, game, 1)
+                            local screenSize = workspace.CurrentCamera.ViewportSize
+                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/2, screenSize.Y/2, 0, true, game, 1)
                             task.wait(0.1)
-                            VirtualInputManager:SendMouseButtonEvent(250, 250, 0, false, game, 1)
+                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/2, screenSize.Y/2, 0, false, game, 1)
                         end)
                         task.wait(0.5)
                     end
                     
-                    -- ระบบออกด่าน (ใช้รีโมทกลับ Lobby ทันที)
                     if MoMoConfig.AutoLeaveRaid then
                         local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
                         if rs then rs:FireServer(unpack({buffer.fromstring("\005\005\000Lobby\004\005\000Lobby")})) end
                         
-                        -- ล็อกลูปไว้จนกว่าจะกลับถึง Lobby (ตัว Client Raid หายไป)
                         repeat 
                             task.wait(0.5) 
                         until not workspace:FindFirstChild("Raids_Visual") or not workspace.Raids_Visual:FindFirstChild(clientRaidName) or not MoMoConfig.AutoRaid
