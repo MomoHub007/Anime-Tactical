@@ -272,7 +272,7 @@ RaidTab:Section({Title = "Raid Loot & Exit (Modular)"})
 
 RaidTab:Toggle({
     Title = "Auto Collect Rewards",
-    Desc = "Auto pick up Golds & Special (Purple collected last)",
+    Desc = "Auto pick up Golds & Special",
     Value = MoMoConfig.AutoCollectReward,
     Callback = function(State)
         MoMoConfig.AutoCollectReward = State
@@ -281,7 +281,7 @@ RaidTab:Toggle({
 })
 
 RaidTab:Toggle({
-    Title = "Auto Dungeons Key (Purple Chest)",
+    Title = "Auto Dungeons Key ",
     Desc = "Collect purple chests (Requires Key)",
     Value = MoMoConfig.AutoDungeonKey,
     Callback = function(State)
@@ -464,7 +464,7 @@ task.spawn(function()
                             local dist = (hrp.Position - mobHrp.Position).Magnitude
                             if dist > 100 then
                                 local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
-                                TweenService:Create(hrp, TweenInfo.new(1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
                                 hasFired = false 
                             else
                                 if not hasFired then
