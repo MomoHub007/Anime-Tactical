@@ -913,7 +913,7 @@ task.spawn(function()
                             local dist = (hrp.Position - mobHrp.Position).Magnitude
                             if dist > 100 then
                                 local standPos = (mobHrp.CFrame * CFrame.new(0, 0, -4)).Position
-                                TweenService:Create(hrp, TweenInfo.new(1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
+                                TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = CFrame.lookAt(standPos, mobHrp.Position)}):Play()
                                 hasFired = false 
                             else
                                 if not hasFired then
