@@ -72,7 +72,7 @@ local DefaultConfig = {
     AutoDungeonKey = false,
     
     -- Trait Config
-    ShowTraitHUD = true,
+    ShowTraitHUD = false,
     AutoRollTrait = false,
     RollTraitUnitName = "",
     RollTraitSlot = "Primary",
@@ -80,7 +80,7 @@ local DefaultConfig = {
     RollTraitDelay = 0.5,
     
     -- Potential Config
-    ShowPotHUD = true,
+    ShowPotHUD = false,
     AutoRollPotential = false,
     RollPotUnitName = "",
     RollPotSlot = "Damage",
