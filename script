@@ -1,5 +1,5 @@
 -- =============================================================
--- MomoHub - Ultra Fast Tween + Auto Boss Fight + Modular Raid
+-- MomoHub - Ultra Fast Tween + Auto Boss Fight + Modular Raid + Auto Trait/Potential (Separated HUDs)
 -- =============================================================
 
 local HttpService = game:GetService("HttpService")
@@ -14,12 +14,18 @@ local RunService = game:GetService("RunService")
 -- Monster List (Multi-Select & Sorted A-Z)
 -- ==========================================
 local MonsterList = {
+    "Company Owner",
     "Demonic Pudding",
     "Flame Brother",
+    "Flame Master",
     "Gigantic Berserker",
     "Goofy Captain",
     "Joker",
     "Legendary Prince",
+    "Mage Sister",
+    "Maid Wash",
+    "Players",
+    "Shield Hero",
     "Shotgun Jr.",
     "Straw Hat",
     "String Scoundrel",
@@ -28,13 +34,7 @@ local MonsterList = {
     "Swordman",
     "Violet Tyrant",
     "Water Teacher",
-    "Weakest Slayer",
-	"Company Owner",
-	"Mage Sister",
-	"Maid Wash",
-	"Shield Hero",
-	"Flame Master",
-	"Players"
+    "Weakest Slayer"
 }
 table.sort(MonsterList) 
 
@@ -56,7 +56,7 @@ local DefaultConfig = {
     AutoAttackAll = false, 
     AutoTween = false, 
     AutoTower = false,
-    AutoBossFight = false, -- เพิ่ม Config สำหรับ Auto Boss Fight
+    AutoBossFight = false, 
     FarmMode = "Near Monster", 
     WalkSpeed = 16,
     JumpPower = 50,
@@ -69,7 +69,23 @@ local DefaultConfig = {
     AutoClearRaid = false,
     AutoCollectReward = false,
     AutoLeaveRaid = false,
-    AutoDungeonKey = false
+    AutoDungeonKey = false,
+    
+    -- Trait Config
+    ShowTraitHUD = true,
+    AutoRollTrait = false,
+    RollTraitUnitName = "",
+    RollTraitSlot = "Primary",
+    RollTargetTraits = {},
+    RollTraitDelay = 0.5,
+    
+    -- Potential Config
+    ShowPotHUD = true,
+    AutoRollPotential = false,
+    RollPotUnitName = "",
+    RollPotSlot = "Damage",
+    RollPotTargetGrades = {},
+    RollPotDelay = 0.5
 }
 
 local MoMoConfig = {}
@@ -129,6 +145,286 @@ local function IsInRaid()
         return true
     end
     return false
+end
+
+-- ==========================================
+-- Trait & Potential Helper Functions
+-- ==========================================
+local function GetPotentialGrade(statName, val)
+    local eps = 0.001
+    if statName == "Abilities_DMG" or statName == "Damage" then
+        if math.abs(val - 0.5) < eps then return "SSS" end
+        if math.abs(val - 0.35) < eps then return "SS+" end
+        if math.abs(val - 0.3) < eps then return "SS" end
+        if math.abs(val - 0.26) < eps then return "SS-" end
+        if math.abs(val - 0.24) < eps then return "S+" end
+        if math.abs(val - 0.22) < eps then return "S" end
+        if math.abs(val - 0.2) < eps then return "S-" end
+        if math.abs(val - 0.18) < eps then return "A+" end
+        if math.abs(val - 0.16) < eps then return "A" end
+        if math.abs(val - 0.14) < eps then return "A-" end
+        if math.abs(val - 0.12) < eps then return "B+" end
+        if math.abs(val - 0.1) < eps then return "B" end
+        if math.abs(val - 0.08) < eps then return "B-" end
+        if math.abs(val - 0.06) < eps then return "C+" end
+        if math.abs(val - 0.04) < eps then return "C" end
+        if math.abs(val - 0.02) < eps then return "C-" end
+    elseif statName == "Speed" then
+        if math.abs(val - 0.5) < eps then return "SSS" end
+        if math.abs(val - 0.6) < eps then return "SS+" end
+        if math.abs(val - 0.72) < eps then return "SS" end
+        if math.abs(val - 0.78) < eps then return "SS-" end
+        if math.abs(val - 0.84) < eps then return "S+" end
+        if math.abs(val - 0.88) < eps then return "S" end
+        if math.abs(val - 0.9) < eps then return "S-" end
+        if math.abs(val - 0.92) < eps then return "A+" end
+        if math.abs(val - 0.94) < eps then return "A" end
+        if math.abs(val - 0.96) < eps then return "A-" end
+        if math.abs(val - 0.98) < eps then return "B+" end
+        if math.abs(val - 1.0) < eps then return "B" end
+        if math.abs(val - 1.02) < eps then return "B-" end
+        if math.abs(val - 1.04) < eps then return "C+" end
+        if math.abs(val - 1.06) < eps then return "C" end
+        if math.abs(val - 1.08) < eps then return "C-" end
+    elseif statName == "Critical_Damage" then
+        if math.abs(val - 1.25) < eps then return "SSS" end
+        if math.abs(val - 1.19) < eps then return "SS+" end
+        if math.abs(val - 1.16) < eps then return "SS" end
+        if math.abs(val - 1.13) < eps then return "SS-" end
+        if math.abs(val - 1.12) < eps then return "S+" end
+        if math.abs(val - 1.11) < eps then return "S" end
+        if math.abs(val - 1.1) < eps then return "S-" end
+        if math.abs(val - 1.09) < eps then return "A+" end
+        if math.abs(val - 1.08) < eps then return "A" end
+        if math.abs(val - 1.07) < eps then return "A-" end
+        if math.abs(val - 1.06) < eps then return "B+" end
+        if math.abs(val - 1.05) < eps then return "B" end
+        if math.abs(val - 1.04) < eps then return "B-" end
+        if math.abs(val - 1.03) < eps then return "C+" end
+        if math.abs(val - 1.02) < eps then return "C" end
+        if math.abs(val - 1.01) < eps then return "C-" end
+    end
+    return "?"
+end
+
+-- ==========================================
+-- 1. Separated Live Status HUDs (Trait & Potential)
+-- ==========================================
+local StatusHUD = Instance.new("ScreenGui")
+StatusHUD.Name = "MoMoStatusHUDs"
+StatusHUD.ResetOnSpawn = false
+pcall(function() StatusHUD.Parent = game:GetService("CoreGui") end)
+if not StatusHUD.Parent then StatusHUD.Parent = player:WaitForChild("PlayerGui") end
+
+for _, child in pairs(StatusHUD.Parent:GetChildren()) do
+    if child.Name == "MoMoStatusHUDs" and child ~= StatusHUD then child:Destroy() end
+end
+
+-- ================= TRAIT HUD =================
+local TraitHudFrame = Instance.new("Frame", StatusHUD)
+TraitHudFrame.Size = UDim2.new(0, 240, 0, 90) 
+TraitHudFrame.Position = UDim2.new(0.7, 0, 0.1, 0)
+TraitHudFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+TraitHudFrame.BackgroundTransparency = 0.1
+TraitHudFrame.BorderSizePixel = 0
+TraitHudFrame.Visible = MoMoConfig.ShowTraitHUD
+Instance.new("UICorner", TraitHudFrame).CornerRadius = UDim.new(0, 8)
+local UIStrokeTraitHud = Instance.new("UIStroke", TraitHudFrame); UIStrokeTraitHud.Color = Color3.fromRGB(255, 215, 0); UIStrokeTraitHud.Thickness = 1.5
+
+local TraitTitleLbl = Instance.new("TextLabel", TraitHudFrame)
+TraitTitleLbl.Size = UDim2.new(1, 0, 0, 25); TraitTitleLbl.BackgroundTransparency = 1; TraitTitleLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
+TraitTitleLbl.Text = "🎯 Trait Monitor"; TraitTitleLbl.Font = Enum.Font.GothamBold; TraitTitleLbl.TextSize = 14
+
+local TraitUnitLbl = Instance.new("TextLabel", TraitHudFrame)
+TraitUnitLbl.Size = UDim2.new(1, -15, 0, 20); TraitUnitLbl.Position = UDim2.new(0, 15, 0, 25); TraitUnitLbl.BackgroundTransparency = 1
+TraitUnitLbl.TextColor3 = Color3.new(1, 1, 1); TraitUnitLbl.Text = "Unit: Waiting..."; TraitUnitLbl.Font = Enum.Font.GothamSemibold; TraitUnitLbl.TextSize = 12; TraitUnitLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local PrimaryLbl = Instance.new("TextLabel", TraitHudFrame)
+PrimaryLbl.Size = UDim2.new(1, -15, 0, 18); PrimaryLbl.Position = UDim2.new(0, 15, 0, 45); PrimaryLbl.BackgroundTransparency = 1
+PrimaryLbl.TextColor3 = Color3.fromRGB(255, 215, 0); PrimaryLbl.Text = "Primary: -"; PrimaryLbl.Font = Enum.Font.Gotham; PrimaryLbl.TextSize = 12; PrimaryLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local SubLbl = Instance.new("TextLabel", TraitHudFrame)
+SubLbl.Size = UDim2.new(1, -15, 0, 18); SubLbl.Position = UDim2.new(0, 15, 0, 63); SubLbl.BackgroundTransparency = 1
+SubLbl.TextColor3 = Color3.fromRGB(0, 200, 255); SubLbl.Text = "Sub: -"; SubLbl.Font = Enum.Font.Gotham; SubLbl.TextSize = 12; SubLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ================= POTENTIAL HUD =================
+local PotHudFrame = Instance.new("Frame", StatusHUD)
+PotHudFrame.Size = UDim2.new(0, 240, 0, 125) 
+PotHudFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
+PotHudFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+PotHudFrame.BackgroundTransparency = 0.1
+PotHudFrame.BorderSizePixel = 0
+PotHudFrame.Visible = MoMoConfig.ShowPotHUD
+Instance.new("UICorner", PotHudFrame).CornerRadius = UDim.new(0, 8)
+local UIStrokePotHud = Instance.new("UIStroke", PotHudFrame); UIStrokePotHud.Color = Color3.fromRGB(170, 0, 255); UIStrokePotHud.Thickness = 1.5
+
+local PotTitle = Instance.new("TextLabel", PotHudFrame)
+PotTitle.Size = UDim2.new(1, 0, 0, 25); PotTitle.BackgroundTransparency = 1; PotTitle.TextColor3 = Color3.fromRGB(170, 0, 255)
+PotTitle.Text = "⚡ Potential Monitor"; PotTitle.Font = Enum.Font.GothamBold; PotTitle.TextSize = 14
+
+local PotUnitLbl = Instance.new("TextLabel", PotHudFrame)
+PotUnitLbl.Size = UDim2.new(1, -15, 0, 20); PotUnitLbl.Position = UDim2.new(0, 15, 0, 25); PotUnitLbl.BackgroundTransparency = 1
+PotUnitLbl.TextColor3 = Color3.new(1, 1, 1); PotUnitLbl.Text = "Unit: Waiting..."; PotUnitLbl.Font = Enum.Font.GothamSemibold; PotUnitLbl.TextSize = 12; PotUnitLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local DmgLbl = Instance.new("TextLabel", PotHudFrame)
+DmgLbl.Size = UDim2.new(1, -15, 0, 18); DmgLbl.Position = UDim2.new(0, 15, 0, 45); DmgLbl.BackgroundTransparency = 1
+DmgLbl.TextColor3 = Color3.fromRGB(255, 100, 100); DmgLbl.Text = "DMG: -"; DmgLbl.Font = Enum.Font.Gotham; DmgLbl.TextSize = 12; DmgLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local AbDmgLbl = Instance.new("TextLabel", PotHudFrame)
+AbDmgLbl.Size = UDim2.new(1, -15, 0, 18); AbDmgLbl.Position = UDim2.new(0, 15, 0, 63); AbDmgLbl.BackgroundTransparency = 1
+AbDmgLbl.TextColor3 = Color3.fromRGB(255, 150, 50); AbDmgLbl.Text = "Abil. DMG: -"; AbDmgLbl.Font = Enum.Font.Gotham; AbDmgLbl.TextSize = 12; AbDmgLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local CritLbl = Instance.new("TextLabel", PotHudFrame)
+CritLbl.Size = UDim2.new(1, -15, 0, 18); CritLbl.Position = UDim2.new(0, 15, 0, 81); CritLbl.BackgroundTransparency = 1
+CritLbl.TextColor3 = Color3.fromRGB(255, 50, 200); CritLbl.Text = "Crit DMG: -"; CritLbl.Font = Enum.Font.Gotham; CritLbl.TextSize = 12; CritLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local SpdLbl = Instance.new("TextLabel", PotHudFrame)
+SpdLbl.Size = UDim2.new(1, -15, 0, 18); SpdLbl.Position = UDim2.new(0, 15, 0, 99); SpdLbl.BackgroundTransparency = 1
+SpdLbl.TextColor3 = Color3.fromRGB(100, 255, 100); SpdLbl.Text = "Speed: -"; SpdLbl.Font = Enum.Font.Gotham; SpdLbl.TextSize = 12; SpdLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+-- HUD Dragging Logic Function
+local function MakeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = frame.Position
+        end
+    end)
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+MakeDraggable(TraitHudFrame)
+MakeDraggable(PotHudFrame)
+
+-- ==========================================
+-- Custom Unit Selector GUI
+-- ==========================================
+-- ==========================================
+-- Custom Unit Selector GUI (With Search & Nickname)
+-- ==========================================
+local SelectorGUI = Instance.new("ScreenGui")
+SelectorGUI.Name = "MoMoUnitSelector"
+SelectorGUI.Enabled = false
+pcall(function() SelectorGUI.Parent = game:GetService("CoreGui") end)
+if not SelectorGUI.Parent then SelectorGUI.Parent = player:WaitForChild("PlayerGui") end
+
+for _, child in pairs(SelectorGUI.Parent:GetChildren()) do
+    if child.Name == "MoMoUnitSelector" and child ~= SelectorGUI then child:Destroy() end
+end
+
+local SelMain = Instance.new("Frame", SelectorGUI)
+SelMain.Size = UDim2.new(0, 400, 0, 340) -- ขยายความสูงหน้าต่างขึ้นเล็กน้อย
+SelMain.Position = UDim2.new(0.5, 200, 0.5, -170)
+SelMain.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+SelMain.BorderSizePixel = 0
+Instance.new("UICorner", SelMain).CornerRadius = UDim.new(0, 8)
+local SelStroke = Instance.new("UIStroke", SelMain); SelStroke.Color = Color3.fromRGB(170, 0, 255); SelStroke.Thickness = 2
+
+local SelTitle = Instance.new("TextLabel", SelMain)
+SelTitle.Size = UDim2.new(1, -40, 0, 40); SelTitle.Position = UDim2.new(0, 10, 0, 0)
+SelTitle.BackgroundTransparency = 1; SelTitle.TextColor3 = Color3.new(1, 1, 1)
+SelTitle.Text = "📋 Select Unit"; SelTitle.Font = Enum.Font.GothamBold; SelTitle.TextSize = 16
+SelTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local CloseBtn = Instance.new("TextButton", SelMain)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1, 1, 1); CloseBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+CloseBtn.MouseButton1Click:Connect(function() SelectorGUI.Enabled = false end)
+
+-- เพิ่มช่องค้นหา (Search Box)
+local SearchBox = Instance.new("TextBox", SelMain)
+SearchBox.Size = UDim2.new(1, -20, 0, 30)
+SearchBox.Position = UDim2.new(0, 10, 0, 45)
+SearchBox.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+SearchBox.TextColor3 = Color3.new(1, 1, 1)
+SearchBox.PlaceholderText = "🔍 Search Name or Trait..."
+SearchBox.Font = Enum.Font.Gotham
+SearchBox.TextSize = 12
+Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 6)
+
+local ScrollFrame = Instance.new("ScrollingFrame", SelMain)
+ScrollFrame.Size = UDim2.new(1, -20, 1, -85) -- ปรับขนาดให้พอดีกับช่องค้นหา
+ScrollFrame.Position = UDim2.new(0, 10, 0, 80)
+ScrollFrame.BackgroundTransparency = 1; ScrollFrame.ScrollBarThickness = 6
+local UIListLayout = Instance.new("UIListLayout", ScrollFrame)
+UIListLayout.Padding = UDim.new(0, 5); UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end)
+
+-- ระบบกรองคำค้นหา
+SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local searchText = string.lower(SearchBox.Text)
+    for _, child in pairs(ScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            if searchText == "" or string.find(string.lower(child.Text), searchText) then
+                child.Visible = true
+            else
+                child.Visible = false
+            end
+        end
+    end
+end)
+
+local function OpenUnitSelector(mode)
+    if mode == "Trait" then
+        SelTitle.Text = "📋 Select Unit [Trait Mode]"
+    else
+        SelTitle.Text = "📋 Select Unit [Potential Mode]"
+    end
+
+    SearchBox.Text = "" -- รีเซ็ตช่องค้นหาทุกครั้งที่เปิดหน้าต่างใหม่
+
+    for _, child in pairs(ScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    pcall(function()
+        local invUnits = game:GetService("ReplicatedStorage").Players_Data[player.Name].Inventory.Units
+        for i, u in ipairs(invUnits:GetChildren()) do
+            -- เช็คว่ามี Nickname ไหม ถ้ามีและไม่ว่างเปล่าให้ใช้ Nickname ถ้าไม่มีให้ใช้ชื่อเดิม
+            local nicknameObj = u:FindFirstChild("Nickname")
+            local displayName = (nicknameObj and nicknameObj.Value ~= "") and nicknameObj.Value or (string.split(u.Name, " - ")[1] or u.Name)
+            
+            local pTrait = u:FindFirstChild("Primary_Trait") and u.Primary_Trait.Value or "-"
+            
+            local btn = Instance.new("TextButton", ScrollFrame)
+            btn.Size = UDim2.new(1, -10, 0, 35); btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            btn.Text = string.format(" %s [P: %s]", displayName, pTrait)
+            btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 12
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+            
+            btn.MouseButton1Click:Connect(function()
+                if mode == "Trait" then
+                    MoMoConfig.RollTraitUnitName = u.Name
+                elseif mode == "Potential" then
+                    MoMoConfig.RollPotUnitName = u.Name
+                end
+                
+                MonitorUnitName = u.Name 
+                CheckAndSave()
+                SelectorGUI.Enabled = false
+                if shared.MoMoWindow then
+                    shared.MoMoWindow:Notify({Title = "✅ Target Saved ("..mode..")", Desc = displayName, Time = 3})
+                end
+            end)
+        end
+    end)
+    SelectorGUI.Enabled = true
 end
 
 -- ==========================================
@@ -258,7 +554,6 @@ MainTab:Toggle({
     end
 })
 
-
 Window:Line()
 
 -- ==========================================
@@ -348,7 +643,113 @@ RaidTab:Toggle({
 Window:Line()
 
 -- ==========================================
--- Tab 3: Player / Settings
+-- Tab 3: Auto Trait
+-- ==========================================
+local TraitTab = Window:Tab({Title = "Auto Trait", Icon = "sparkles"})
+
+TraitTab:Button({
+    Title = "📋 Open Unit Selector [Trait]",
+    Desc = "Select the target unit specifically for Trait Rerolling.",
+    Callback = function() OpenUnitSelector("Trait") end
+})
+
+TraitTab:Toggle({
+    Title = "👁️ Show Trait Live Stats",
+    Desc = "Toggle the Trait Live HUD display on/off.",
+    Value = MoMoConfig.ShowTraitHUD,
+    Callback = function(State)
+        MoMoConfig.ShowTraitHUD = State
+        if TraitHudFrame then TraitHudFrame.Visible = State end
+        CheckAndSave()
+    end
+})
+
+TraitTab:Section({Title = "Trait Roll Settings"})
+TraitTab:Dropdown({
+    Title = "Trait Slot", List = {"Primary", "Sub"}, Value = MoMoConfig.RollTraitSlot,
+    Callback = function(val) MoMoConfig.RollTraitSlot = val; CheckAndSave() end
+})
+
+
+local AvailableTraits = {
+    "Extremist_1", "Archmage_1", "Gods Blessing_1", 
+    "Godspeed_1", "Prodigy_1", "Deadeye_1", "Leader_1",
+    "CEO_1", "Annihilator_1", "Fortunate_1"
+}
+TraitTab:Dropdown({
+    Title = "Target Traits", Desc = "Select the traits you want to stop at.", List = AvailableTraits, Multi = true, Value = MoMoConfig.RollTargetTraits,
+    Callback = function(val) MoMoConfig.RollTargetTraits = val; CheckAndSave() end
+})
+TraitTab:Slider({
+    Title = "Roll Delay (Sec)", Min = 0.1, Max = 5, Rounding = 1, Value = MoMoConfig.RollTraitDelay,
+    Callback = function(val) MoMoConfig.RollTraitDelay = val; CheckAndSave() end
+})
+TraitTab:Toggle({
+    Title = "Start Auto Roll Trait", Value = MoMoConfig.AutoRollTrait,
+    Callback = function(State) MoMoConfig.AutoRollTrait = State; CheckAndSave() end
+})
+
+-- ==========================================
+-- Tab 4: Auto Potential
+-- ==========================================
+local PotTab = Window:Tab({Title = "Auto Potential", Icon = "zap"})
+
+PotTab:Button({
+    Title = "📋 Open Unit Selector [Potential]",
+    Desc = "Select the target unit specifically for Potential Rerolling.",
+    Callback = function() OpenUnitSelector("Potential") end
+})
+
+PotTab:Toggle({
+    Title = "👁️ Show Potential Live Stats",
+    Desc = "Toggle the Potential Live HUD display on/off.",
+    Value = MoMoConfig.ShowPotHUD,
+    Callback = function(State)
+        MoMoConfig.ShowPotHUD = State
+        if PotHudFrame then PotHudFrame.Visible = State end
+        CheckAndSave()
+    end
+})
+
+PotTab:Section({Title = "Potential Roll Settings"})
+PotTab:Dropdown({
+    Title = "Potential Slot",
+    Desc = "Select the stat you want to reroll.",
+    List = {"Damage", "Abilities_DMG", "Speed", "Critical_Damage"},
+    Value = MoMoConfig.RollPotSlot,
+    Callback = function(val)
+        MoMoConfig.RollPotSlot = val; CheckAndSave()
+    end
+})
+
+local PotGrades = {"SSS", "SS+", "SS", "SS-", "S+", "S", "S-", "A+", "A", "A-"}
+PotTab:Dropdown({
+    Title = "Target Grades",
+    Desc = "Select your desired grades to stop at.",
+    List = PotGrades,
+    Multi = true,
+    Value = MoMoConfig.RollPotTargetGrades,
+    Callback = function(val)
+        MoMoConfig.RollPotTargetGrades = val; CheckAndSave()
+    end
+})
+
+PotTab:Slider({
+    Title = "Roll Delay (Sec)", Min = 0.1, Max = 5, Rounding = 1, Value = MoMoConfig.RollPotDelay,
+    Callback = function(val) MoMoConfig.RollPotDelay = val; CheckAndSave() end
+})
+
+PotTab:Toggle({
+    Title = "Start Auto Roll Potential",
+    Desc = "Begin rolling for the selected potentials.",
+    Value = MoMoConfig.AutoRollPotential,
+    Callback = function(State)
+        MoMoConfig.AutoRollPotential = State; CheckAndSave()
+    end
+})
+
+-- ==========================================
+-- Tab 5: Player / Settings
 -- ==========================================
 local PlayerTab = Window:Tab({Title = "Player", Icon = "user"})
 PlayerTab:Slider({
@@ -372,6 +773,8 @@ PlayerTab:Slider({
 
 local SettingsTab = Window:Tab({Title = "Settings", Icon = "wrench"})
 local AntiAfkConnection
+
+SettingsTab:Section({Title = "Utility"})
 SettingsTab:Toggle({
     Title = "Anti-AFK", Value = MoMoConfig.AntiAFK,
     Callback = function(State)
@@ -390,12 +793,11 @@ SettingsTab:Toggle({
 SettingsTab:Toggle({Title = "Auto Save Config", Value = MoMoConfig.AutoSave, Callback = function(State) MoMoConfig.AutoSave = State; SaveConfig() end})
 SettingsTab:Toggle({Title = "Auto Load Config", Value = MoMoConfig.AutoLoad, Callback = function(State) MoMoConfig.AutoLoad = State; SaveConfig() end})
 
-Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully! [Boss Fight Updated]", Time = 4})
+Window:Notify({Title = "MoMoHub", Desc = "Loaded Successfully! [Separated HUDs]", Time = 4})
 
 -- ==========================================
 -- General Background Loop System
 -- ==========================================
-
 task.spawn(function()
     while task.wait(1) do
         if MoMoConfig.AutoRaid or MoMoConfig.AutoTween or MoMoConfig.AutoClearRaid or MoMoConfig.AutoTower or MoMoConfig.AutoBossFight then
@@ -484,7 +886,6 @@ end
 
 task.spawn(function()
     while task.wait(0.01) do 
-        -- Pause if Raid or Tower is active, OR if Boss is Spawned and enabled
         local isBossPriorityActive = MoMoConfig.AutoBossFight and IsBossSpawned()
         
         if MoMoConfig.AutoTween and not MoMoConfig.AutoRaid and not MoMoConfig.AutoClearRaid and not MoMoConfig.AutoTower and not isBossPriorityActive then 
@@ -551,11 +952,9 @@ task.spawn(function()
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 if not hrp then return end
 
-                -- Priority 1: Finish active Raid first
                 if IsInRaid() then return end
 
                 if IsBossSpawned() then
-                    -- Search for Boss in Clients
                     local worlds = workspace:FindFirstChild("Worlds")
                     local clientsFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Clients")
                     local serverFolder = worlds and worlds:FindFirstChild("Targets") and worlds.Targets:FindFirstChild("Server")
@@ -579,7 +978,6 @@ task.spawn(function()
                     end
 
                     if targetMob then
-                        -- Combat Loop for Boss
                         local mobHrp = targetMob:FindFirstChild("HumanoidRootPart")
                         local serverMob = serverFolder and serverFolder:FindFirstChild(targetMob.Name)
                         local serverHum = serverMob and serverMob:FindFirstChild("Humanoid")
@@ -625,7 +1023,6 @@ task.spawn(function()
                             until serverHum.Health <= 0
                         end
                     else
-                        -- Navigation to Boss (If not found locally)
                         local rs = game:GetService("ReplicatedStorage"):FindFirstChild("ByteNetReliable")
                         if rs then rs:FireServer(unpack({buffer.fromstring("\005\f\000Demon Forest")})) end
                         
@@ -642,7 +1039,7 @@ task.spawn(function()
                             local tPart = demonForestEnter:IsA("Model") and demonForestEnter.PrimaryPart or demonForestEnter:FindFirstChildWhichIsA("BasePart") or demonForestEnter
                             if tPart and tPart:IsA("BasePart") then
                                 hrp.CFrame = tPart.CFrame
-                                task.wait(3)	 
+                                task.wait(3)     
                             end
                         end
                     end
@@ -911,7 +1308,6 @@ task.spawn(function()
             local serverRaid = raidsVisual and raidsVisual:FindFirstChild(serverRaidName)
             local clientRaid = raidsVisual and raidsVisual:FindFirstChild(clientRaidName)
 
-            -- Priority 1: Prevent joining new raid if Boss is spawned and enabled
             local isBossPriorityActive = MoMoConfig.AutoBossFight and IsBossSpawned()
 
             if MoMoConfig.AutoRaid and not clientRaid and not isBossPriorityActive then
@@ -1011,9 +1407,9 @@ task.spawn(function()
                         task.wait(1.5) 
                         pcall(function()
                             local screenSize = workspace.CurrentCamera.ViewportSize
-                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/10, screenSize.Y/2, 0, true, game, 1)
+                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/4, screenSize.Y/4, 0, true, game, 1)
                             task.wait(0.1)
-                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/10, screenSize.Y/2, 0, false, game, 1)
+                            VirtualInputManager:SendMouseButtonEvent(screenSize.X/4, screenSize.Y/4, 0, false, game, 1)
                         end)
                         task.wait(0.5)
                     end
@@ -1029,5 +1425,169 @@ task.spawn(function()
                 end
             end
         end)
+    end
+end)
+
+-- ==========================================
+-- Background Loop: HUD Updaters (Separated)
+-- ==========================================
+
+-- Trait HUD Updater
+task.spawn(function()
+    while task.wait(0.2) do
+        if MoMoConfig.ShowTraitHUD and MoMoConfig.RollTraitUnitName ~= "" then
+            pcall(function()
+                local charData = game:GetService("ReplicatedStorage"):FindFirstChild("Players_Data")
+                if charData and charData:FindFirstChild(player.Name) then
+                    local targetUnit = charData[player.Name].Inventory.Units:FindFirstChild(MoMoConfig.RollTraitUnitName)
+                    if targetUnit then
+                        local baseName = string.split(targetUnit.Name, " - ")[1] or targetUnit.Name
+                        TraitUnitLbl.Text = "Unit: " .. baseName
+                        
+                        local pTrait = targetUnit:FindFirstChild("Primary_Trait")
+                        local sTrait = targetUnit:FindFirstChild("Sub_Trait")
+                        PrimaryLbl.Text = "Primary: " .. (pTrait and pTrait.Value or "-")
+                        SubLbl.Text = "Sub: " .. (sTrait and sTrait.Value or "-")
+                    end
+                end
+            end)
+        elseif MoMoConfig.RollTraitUnitName == "" then
+            TraitUnitLbl.Text = "Unit: Waiting..."
+            PrimaryLbl.Text = "Primary: -"
+            SubLbl.Text = "Sub: -"
+        end
+    end
+end)
+
+-- Potential HUD Updater
+task.spawn(function()
+    while task.wait(0.2) do
+        if MoMoConfig.ShowPotHUD and MoMoConfig.RollPotUnitName ~= "" then
+            pcall(function()
+                local charData = game:GetService("ReplicatedStorage"):FindFirstChild("Players_Data")
+                if charData and charData:FindFirstChild(player.Name) then
+                    local targetUnit = charData[player.Name].Inventory.Units:FindFirstChild(MoMoConfig.RollPotUnitName)
+                    if targetUnit then
+                        local baseName = string.split(targetUnit.Name, " - ")[1] or targetUnit.Name
+                        PotUnitLbl.Text = "Unit: " .. baseName
+                        
+                        local pots = targetUnit:FindFirstChild("Potentials_Adjustment")
+                        if pots then
+                            local dVal = pots:FindFirstChild("Damage") and pots.Damage.Value or 0
+                            local aVal = pots:FindFirstChild("Abilities_DMG") and pots.Abilities_DMG.Value or 0
+                            local cVal = pots:FindFirstChild("Critical_Damage") and pots.Critical_Damage.Value or 0
+                            local sVal = pots:FindFirstChild("Speed") and pots.Speed.Value or 0
+                            
+                            DmgLbl.Text = "DMG: " .. GetPotentialGrade("Damage", dVal) .. " (" .. tostring(dVal) .. ")"
+                            AbDmgLbl.Text = "Abil. DMG: " .. GetPotentialGrade("Abilities_DMG", aVal) .. " (" .. tostring(aVal) .. ")"
+                            CritLbl.Text = "Crit DMG: " .. GetPotentialGrade("Critical_Damage", cVal) .. " (" .. tostring(cVal) .. ")"
+                            SpdLbl.Text = "Speed: " .. GetPotentialGrade("Speed", sVal) .. " (" .. tostring(sVal) .. ")"
+                        end
+                    end
+                end
+            end)
+        elseif MoMoConfig.RollPotUnitName == "" then
+            PotUnitLbl.Text = "Unit: Waiting..."
+            DmgLbl.Text = "DMG: -"
+            AbDmgLbl.Text = "Abil. DMG: -"
+            CritLbl.Text = "Crit DMG: -"
+            SpdLbl.Text = "Speed: -"
+        end
+    end
+end)
+
+-- ==========================================
+-- Background Loop: Auto Roll Trait
+-- ==========================================
+task.spawn(function()
+    while task.wait(0.1) do
+        if MoMoConfig.AutoRollTrait and MoMoConfig.RollTraitUnitName ~= "" then
+            pcall(function()
+                local charData = game:GetService("ReplicatedStorage"):FindFirstChild("Players_Data")
+                if not charData then return end
+                local targetUnit = charData[player.Name].Inventory.Units:FindFirstChild(MoMoConfig.RollTraitUnitName)
+                if not targetUnit then return end
+
+                local traitValueObj = targetUnit:FindFirstChild(MoMoConfig.RollTraitSlot .. "_Trait")
+                if not traitValueObj then return end
+
+                local currentValue = traitValueObj.Value
+                local gotWantedTrait = false
+                if type(MoMoConfig.RollTargetTraits) == "table" then
+                    for _, wanted in pairs(MoMoConfig.RollTargetTraits) do
+                        if currentValue == wanted then gotWantedTrait = true; break end
+                    end
+                end
+
+                if gotWantedTrait then
+                    MoMoConfig.AutoRollTrait = false 
+                    if shared.MoMoWindow then shared.MoMoWindow:Notify({Title = "🎉 Trait Rolled!", Desc = "Successfully rolled: " .. currentValue, Time = 10}) end
+                    return
+                end
+
+                local serverArgsTraits = {}
+                if type(MoMoConfig.RollTargetTraits) == "table" then
+                    for _, trait in pairs(MoMoConfig.RollTargetTraits) do
+                        local baseName = string.split(trait, "_")[1]
+                        if not table.find(serverArgsTraits, baseName) then table.insert(serverArgsTraits, baseName) end
+                    end
+                end
+
+                local args = {MoMoConfig.RollTraitUnitName, MoMoConfig.RollTraitSlot, serverArgsTraits, false}
+                game:GetService("ReplicatedStorage").Remotes.Gamblings.Traits:FireServer(unpack(args))
+                task.wait(MoMoConfig.RollTraitDelay)
+            end)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+-- ==========================================
+-- Background Loop: Auto Roll Potential
+-- ==========================================
+task.spawn(function()
+    while task.wait(0.1) do
+        if MoMoConfig.AutoRollPotential and MoMoConfig.RollPotUnitName ~= "" then
+            pcall(function()
+                local charData = game:GetService("ReplicatedStorage"):FindFirstChild("Players_Data")
+                if not charData then return end
+                local targetUnit = charData[player.Name].Inventory.Units:FindFirstChild(MoMoConfig.RollPotUnitName)
+                if not targetUnit then return end
+
+                local potFolder = targetUnit:FindFirstChild("Potentials_Adjustment")
+                if not potFolder then return end
+                
+                local potValueObj = potFolder:FindFirstChild(MoMoConfig.RollPotSlot)
+                if not potValueObj then return end
+
+                local currentVal = potValueObj.Value
+                local currentGrade = GetPotentialGrade(MoMoConfig.RollPotSlot, currentVal)
+
+                local gotWantedGrade = false
+                if type(MoMoConfig.RollPotTargetGrades) == "table" then
+                    for _, wanted in pairs(MoMoConfig.RollPotTargetGrades) do
+                        if currentGrade == wanted then gotWantedGrade = true; break end
+                    end
+                end
+
+                if gotWantedGrade then
+                    MoMoConfig.AutoRollPotential = false 
+                    if shared.MoMoWindow then shared.MoMoWindow:Notify({Title = "⚡ Potential Rolled!", Desc = "Successfully rolled grade: " .. currentGrade, Time = 10}) end
+                    return
+                end
+
+                local args = {
+                    MoMoConfig.RollPotUnitName,
+                    "Reroll",
+                    MoMoConfig.RollPotSlot
+                }
+                game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Systems"):WaitForChild("Potentials_Rolling"):FireServer(unpack(args))
+                
+                task.wait(MoMoConfig.RollPotDelay)
+            end)
+        else
+            task.wait(1)
+        end
     end
 end)
